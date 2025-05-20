@@ -76,6 +76,7 @@ int main() {
   while (1) {
     int valread = read(new_socket, &buffer_size, sizeof(buffer_size));
     buffer_size = ntohl(buffer_size);
+    printf("buffersize test : %d\n", buffer_size);
     if (valread <= 0)
       break;
     int command_size = 0;
@@ -84,7 +85,7 @@ int main() {
     char *buffer = malloc(buffer_size);
     int total = 0;
     while (total < buffer_size) {
-      valread = read(new_socket, &buffer[total], buffer_size - total);
+      valread = read(new_socket, &buffer[total], buffer_size - total + 1);
       total = total + valread + 1;
     }
     int current_part = 0;
@@ -139,11 +140,7 @@ int main() {
     key[key_size] = '\0';
     target[target_size] = '\0';
 
-    printf("key %s", command);
-    printf("%d\n", command_size);
-
     int index = fnv1a_hash(key) % 1024;
-    printf("cominghere %d\n", strcmp(command, "get"));
     if (strcmp(command, "set") == 0) {
       struct slot *temp = malloc(sizeof(struct slot));
       temp->key = malloc(strlen(key) + 1);
@@ -151,24 +148,55 @@ int main() {
       temp->value = malloc(strlen(target) + 1);
       strcpy(temp->value, target);
       table[index] = temp;
-      printf("%s\n", table[index]->value);
-      printf("%s\n", table[index]->key);
-
+      char succ_mess[19] = "stored succesfully\n";
+      uint32_t return_size = htonl(strlen(succ_mess));
+      printf("here too %d,   sizeof : %d\n", ntohl(return_size),
+             (int)sizeof(return_size));
+      printf("raw buffer<ise : %u\n", return_size);
+      if (send(new_socket, &return_size, sizeof(return_size), 0) < 0) {
+        printf("error");
+        perror("send (length) failed");
+      }
+      printf("fdsfdsfds");
+      if (send(new_socket, "stored succesfully\n",
+               strlen("stored succesfully\n"),
+               0) < 0) { // Use strlen(buffer), not sizeof
+        perror("send (message) failed");
+      }
+      printf("toooo");
+      fflush(stdout);
     } else if (strcmp(command, "get") == 0) {
-      printf("bbb");
+      printf("bbb\n");
       struct slot *result_value = table[index];
-      int not_found = 1;
-      while (not_found) {
+      while (result_value != NULL) {
         printf("what");
         if (strcmp(result_value->key, key)) {
-          continue;
+          break;
         }
         result_value = table[index]->next_slot;
       }
-      send(new_socket, table[index]->key, sizeof(table[index]->key), 0);
-      not_found = 0;
+      printf("%s\n", table[index]->key);
+      uint32_t return_size = htonl(strlen(table[index]->value));
+      if (send(new_socket, &return_size, sizeof(return_size), 0) < 0) {
+        perror("send (length) failed");
+      }
+
+      if (send(new_socket, table[index]->value, strlen(table[index]->value),
+               0) < 0) { // Use strlen(buffer), not sizeof
+        perror("send (message) failed");
+      }
     } else {
-      send(new_socket, "command not found", sizeof("command not found"), 0);
+      uint32_t return_size = htonl(strlen("command not found\n"));
+      printf("here too\n");
+      if (send(new_socket, &return_size, sizeof(return_size), 0) < 0) {
+        printf("error");
+        perror("send (length) failed");
+      }
+      printf("fdsfdsfds");
+      if (send(new_socket, "command not found\n", strlen("command not found\n"),
+               0) < 0) { // Use strlen(buffer), not sizeof
+        perror("send (message) failed");
+      }
     }
     // printf("you: ");
     // fgets(buffer, sizeof(buffer), stdin);
